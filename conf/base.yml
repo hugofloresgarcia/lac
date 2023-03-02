@@ -49,9 +49,6 @@ lambdas:
   vq/commitment_loss: 0.25
   vq/codebook_loss: 1.0
 
-batch_size: 128
-train/AudioDataset.duration: 0.38
-
 VolumeNorm.db: [const, -16]
 
 # Transforms
@@ -65,8 +62,29 @@ build_transform.postprocess:
   - RescaleAudio
   - ShiftPhase
 
+# Loss setup
+MultiScaleSTFTLoss.window_lengths:
+  - 2048
+  - 512
+
+MelSpectrogramLoss.n_mels:
+  - 256
+MelSpectrogramLoss.pow: 1.0
+MelSpectrogramLoss.clamp_eps: 1.0e-5
+MelSpectrogramLoss.mag_weight: 0.0
 
 # Data
+batch_size: 128
+train/AudioDataset.duration: 0.38
+train/AudioDataset.n_examples: 10000000
+
+val/AudioDataset.duration: 5.0
+val/build_transform.augment_prob: 1.0
+val/AudioDataset.n_examples: 250
+
+AudioLoader.shuffle: true
+AudioDataset.without_replacement: true
+
 train/build_dataset.folders:
   speech_hq:
     - /data/daps
@@ -90,6 +108,6 @@ val/build_dataset.folders:
   speech_hq:
     - /data/daps
   music_hq:
-    - /data/musdb/val
+    - /data/musdb/test
   general: 
     - /data/audioset/data/eval_segments/
