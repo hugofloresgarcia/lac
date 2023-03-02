@@ -1,0 +1,21 @@
+argbind>=0.3.1
+audiotools @ git+https://github.com/descriptinc/lyrebird-audiotools.git@0.6.3
+tensorboard
+pytest
+pytest-cov
+pynvml
+psutil
+pandas
+onnx
+onnx-simplifier
+seaborn
+jupyterlab
+jupyterlab-link-share
+pandas
+watchdog
+pesq
+tabulate
+tensorboardX
+gradio
+einops
+encodec

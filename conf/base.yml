@@ -1,0 +1,95 @@
+# Model setup
+LAC.sample_rate: 44100
+LAC.encoder_dim: 64
+LAC.encoder_rates: [2, 4, 8, 8]
+LAC.decoder_dim: 512
+LAC.decoder_rates: [4, 4, 4, 2, 2, 2]
+
+# Quantization
+LAC.n_codebooks: 9
+LAC.codebook_size: 1024
+LAC.codebook_dim: 8
+LAC.quantizer_dropout: true
+
+# Discriminator
+Discriminator.sample_rate: 44100
+Discriminator.rates: [1]
+Discriminator.fft_sizes: [2048, 1024, 512]
+Discriminator.bands:
+  - [0.0, 0.1]
+  - [0.1, 0.25]
+  - [0.25, 0.5]
+  - [0.5, 0.75]
+  - [0.75, 1.0]
+
+# Optimization
+AutoClip.frequency: 1
+AutoClip.percentile: 10
+
+AdamW.betas: [0.8, 0.99]
+discriminator/AdamW.lr: 0.0001
+discriminator/ExponentialLR.gamma: 0.999996
+generator/AdamW.lr: 0.0001
+generator/ExponentialLR.gamma: 0.999996
+
+amp: false
+val_batch_size: 100
+device: cuda
+epoch_length: 1000
+num_epochs: 3000
+save_epochs: [10, 50, 100, 250, 500]
+num_workers: 8
+save_audio_epochs: 10
+val_idx: [0, 1, 2, 3, 4, 5, 6, 7]
+seed: 0
+lambdas:
+  mel/loss: 100.0
+  adv/feat_loss: 2.0
+  adv/gen_loss: 1.0
+  vq/commitment_loss: 0.25
+  vq/codebook_loss: 1.0
+
+batch_size: 128
+train/AudioDataset.duration: 0.38
+
+VolumeNorm.db: [const, -16]
+
+# Transforms
+build_transform.preprocess:
+  - Identity
+build_transform.augment_prob: 0.0
+build_transform.augment:
+  - Identity
+build_transform.postprocess:
+  - VolumeNorm
+  - RescaleAudio
+  - ShiftPhase
+
+
+# Data
+train/build_dataset.folders:
+  speech_hq:
+    - /data/daps
+    - /data/vocalset
+  speech_uq:
+    - /data/read_speech/
+    - /data/emotional_speech/
+    - /data/common_voice/
+    - /data/french_speech/
+    - /data/german_speech/
+    - /data/russian_speech/
+    - /data/spanish_speech/
+  music_hq:
+    - /data/musdb/train
+  music_uq:
+    - /data/jamendo
+  general: 
+    - /data/audioset/data/unbalanced_train_segments/
+
+val/build_dataset.folders:
+  speech_hq:
+    - /data/daps
+  music_hq:
+    - /data/musdb/val
+  general: 
+    - /data/audioset/data/eval_segments/

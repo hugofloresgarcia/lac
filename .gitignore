@@ -104,9 +104,8 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
+env/env.sh
 venv/
-ENV/
 env.bak/
 venv.bak/
 
@@ -127,3 +126,44 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Files created by experiments
+output/
+snapshot/
+*.m4a
+*.wav
+notebooks/scratch.ipynb
+notebooks/inspect.ipynb
+notebooks/effects.ipynb
+notebooks/*.ipynb
+notebooks/*.gif
+notebooks/*.wav
+notebooks/*.mp4
+*runs/
+boards/
+samples/
+*.ipynb
+
+results.json
+metrics.csv
+mprofile_*
+mem.png
+
+results/
+mprofile*
+*.png
+# do not ignore the test wav file
+!tests/audio/short_test_audio.wav
+!tests/audio/output.wav
+*/.DS_Store
+.DS_Store
+env.sh
+_codebraid/
+**/*.html
+**/*.exec.md
+flagged/
+log.txt
+ckpt/
+.syncthing*
+tests/assets/
+archived/
