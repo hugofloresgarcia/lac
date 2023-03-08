@@ -216,6 +216,7 @@ class LAC(BaseModel, CodecMixin):
         n_codebooks: int = 9,
         codebook_size: int = 1024,
         codebook_dim: Union[int, list] = 8,
+        quantizer_dropout: bool = False,
         sample_rate: int = 44100,
     ):
         super().__init__()
@@ -237,7 +238,8 @@ class LAC(BaseModel, CodecMixin):
             self.encoder.enc_dim, 
             n_codebooks=n_codebooks,
             codebook_size=codebook_size,
-            codebook_dim=codebook_dim
+            codebook_dim=codebook_dim,
+            quantizer_dropout=quantizer_dropout,
         )
 
         self.decoder = Decoder(

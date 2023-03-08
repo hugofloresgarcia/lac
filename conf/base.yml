@@ -2,7 +2,7 @@
 LAC.sample_rate: 44100
 LAC.encoder_dim: 64
 LAC.encoder_rates: [2, 4, 8, 8]
-LAC.decoder_dim: 512
+LAC.decoder_dim: 1536
 LAC.decoder_rates: [4, 4, 4, 2, 2, 2]
 
 # Quantization
@@ -13,7 +13,8 @@ LAC.quantizer_dropout: true
 
 # Discriminator
 Discriminator.sample_rate: 44100
-Discriminator.rates: [1]
+Discriminator.rates: []
+Discriminator.periods: [2, 3, 5, 7, 11]
 Discriminator.fft_sizes: [2048, 1024, 512]
 Discriminator.bands:
   - [0.0, 0.1]
@@ -74,7 +75,7 @@ MelSpectrogramLoss.clamp_eps: 1.0e-5
 MelSpectrogramLoss.mag_weight: 0.0
 
 # Data
-batch_size: 128
+batch_size: 96
 train/AudioDataset.duration: 0.38
 train/AudioDataset.n_examples: 10000000
 
@@ -86,14 +87,16 @@ AudioLoader.shuffle: true
 AudioDataset.without_replacement: true
 
 train/build_dataset.folders:
+  speech_fb:
+    - /data/daps/train
   speech_hq:
-    - /data/daps
+    - /data/vctk
     - /data/vocalset
+    - /data/read_speech
+    - /data/french_speech
   speech_uq:
-    - /data/read_speech/
     - /data/emotional_speech/
     - /data/common_voice/
-    - /data/french_speech/
     - /data/german_speech/
     - /data/russian_speech/
     - /data/spanish_speech/
@@ -103,10 +106,11 @@ train/build_dataset.folders:
     - /data/jamendo
   general: 
     - /data/audioset/data/unbalanced_train_segments/
+    - /data/audioset/data/balanced_train_segments/
 
 val/build_dataset.folders:
   speech_hq:
-    - /data/daps
+    - /data/daps/val
   music_hq:
     - /data/musdb/test
   general: 

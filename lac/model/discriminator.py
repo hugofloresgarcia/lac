@@ -24,6 +24,42 @@ def WNConv2d(*args, **kwargs):
     return nn.Sequential(conv, nn.LeakyReLU(0.1))
 
 
+class MPD(nn.Module):
+    def __init__(self, period):
+        super().__init__()
+        self.period = period
+        self.convs = nn.ModuleList(
+            [
+                WNConv2d(1, 32, (5, 1), (3, 1), padding=(2, 0)),
+                WNConv2d(32, 128, (5, 1), (3, 1), padding=(2, 0)),
+                WNConv2d(128, 512, (5, 1), (3, 1), padding=(2, 0)),
+                WNConv2d(512, 1024, (5, 1), (3, 1), padding=(2, 0)),
+                WNConv2d(1024, 1024, (5, 1), 1, padding=(2, 0)),
+            ]
+        )
+        self.conv_post = WNConv2d(1024, 1, kernel_size=(3, 1), padding=(1, 0), act=False)
+
+    def pad_to_period(self, x):
+        t = x.shape[-1]
+        x = F.pad(x, (0, self.period - t % self.period), mode="reflect")
+        return x
+
+    def forward(self, x):
+        fmap = []
+
+        x = self.pad_to_period(x)
+        x = rearrange(x, "b c (l p) -> b c l p", p=self.period)
+
+        for layer in self.convs:
+            x = layer(x)
+            fmap.append(x)
+
+        x = self.conv_post(x)
+        fmap.append(x)
+
+        return fmap
+
+
 class MSD(nn.Module):
     def __init__(self, rate: int = 1, sample_rate: int = 44100):
         super().__init__()
@@ -137,13 +173,15 @@ class MRD(nn.Module):
 class Discriminator(ml.BaseModel):
     def __init__(
         self,
-        rates: list = [1],
+        rates: list = [],
+        periods = [2, 3, 5, 7, 11],
         fft_sizes: list = [2048, 1024, 512],
         sample_rate: int = 44100,
         bands: list = BANDS,
     ):
         super().__init__()
         discs = []
+        discs += [MPD(p) for p in periods]
         discs += [MSD(r, sample_rate=sample_rate) for r in rates]
         discs += [MRD(f, sample_rate=sample_rate, bands=bands) for f in fft_sizes]
         self.discriminators = nn.ModuleList(discs)
