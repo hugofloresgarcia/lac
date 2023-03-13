@@ -14,6 +14,7 @@ class CodecMixin:
         self,
         audio_path_or_signal,
         overlap_win_duration: float = 5.0,
+        overlap_hop_ratio: float = 0.5,
         verbose: bool = False,
         normalize_db: float = -16,
         match_input_db: bool = False,
@@ -42,8 +43,7 @@ class CodecMixin:
         if normalize_db is not None:
             audio_signal.normalize(normalize_db)
         audio_signal.ensure_max_of_audio()
-        overlap_hop_duration = overlap_win_duration * 0.5
-        boundary = int(overlap_hop_duration * self.sample_rate / 2)
+        overlap_hop_duration = overlap_win_duration * overlap_hop_ratio
         do_overlap_and_add = audio_signal.signal_duration > overlap_win_duration
 
         nb, nac, nt = audio_signal.audio_data.shape
@@ -73,20 +73,17 @@ class CodecMixin:
             _output_signal = AudioSignal(_output, self.sample_rate).to(self.device)
             audio_signal.audio_data[i] = _output_signal.audio_data.cpu()
 
-        enhanced = audio_signal
-        enhanced._loudness = None
-        enhanced.stft_data = None
+        recons = audio_signal
+        recons._loudness = None
+        recons.stft_data = None
 
         if do_overlap_and_add:
-            enhanced.trim(boundary, boundary)
-            enhanced.audio_data = enhanced.audio_data.reshape(nb, nac, -1)
-            enhanced.trim(boundary, boundary)
-            enhanced.truncate_samples(nt)
-        enhanced.audio_data = enhanced.audio_data.reshape(nb, nac, nt)
+            recons = recons.overlap_and_add(overlap_hop_duration)
+            recons.audio_data = recons.audio_data.reshape(nb, nac, -1)
 
         if match_input_db:
-            enhanced.ffmpeg_loudness()
-            enhanced = enhanced.normalize(input_db)
+            recons.ffmpeg_loudness()
+            recons = recons.normalize(input_db)
 
-        enhanced.truncate_samples(original_length)
-        return enhanced
+        recons.truncate_samples(original_length)
+        return recons        
