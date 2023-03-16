@@ -230,8 +230,8 @@ class ResidualVectorQuantize(nn.Module):
         """
         z_q = 0
         z_p = []
-        dims = np.cumsum([0] + [q.codebook_dim for q in self.quantizers])
         codes = []
+        dims = np.cumsum([0] + [q.codebook_dim for q in self.quantizers])
 
         n_codebooks = np.where(dims <= latents.shape[1])[0].max(axis=0, keepdims=True)[
             0
