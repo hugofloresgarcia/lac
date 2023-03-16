@@ -260,19 +260,39 @@ class LAC(BaseModel, CodecMixin):
         audio_data = nn.functional.pad(audio_data, (0, right_pad))
         return audio_data, length
 
+    def encode(
+        self, 
+        audio_data: torch.Tensor, 
+        sample_rate: int = None,
+        n_quantizers: int = None,
+    ):
+        out = {}
+        audio_data, length = self.preprocess(audio_data, sample_rate)
+        out["length"] = length
+        
+        out["z"] = self.encoder(audio_data)
+        out.update(self.quantizer(out["z"], n_quantizers))
+        return out
+
+    def decode(
+        self, 
+        z: torch.Tensor,
+        length: int = None
+    ):
+        out = {}
+        x = self.decoder(z)
+        out["audio"] = x[..., :length]
+        return out
+
     def forward(
         self,
         audio_data: torch.Tensor,
         sample_rate: int = None,
         n_quantizers: int = None,
     ):
-        audio_data, length = self.preprocess(audio_data, sample_rate)
         out = {}
-        out["z"] = self.encoder(audio_data)
-        out.update(self.quantizer(out["z"], n_quantizers))
-        x = self.decoder(out["z"])
-        out["audio"] = x[..., :length]
-
+        out.update(self.encode(audio_data, sample_rate, n_quantizers))
+        out.update(self.decode(out["z"], out["length"]))
         return out
 
 

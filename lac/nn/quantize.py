@@ -230,20 +230,20 @@ class ResidualVectorQuantize(nn.Module):
         """
         z_q = 0
         z_p = []
-        codes = []
-
         dims = np.cumsum([0] + [q.codebook_dim for q in self.quantizers])
 
-        for i in range(self.n_codebooks):
+        n_codebooks = np.where(dims <= latents.shape[1])[0].max(axis=0, keepdims=True)[
+            0
+        ]
+        for i in range(n_codebooks):
             j, k = dims[i], dims[i + 1]
-            z_p_i, codes_i = self.quantizers[i].decode_latents(latents[:, j:k, :])
+            z_p_i, _ = self.quantizers[i].decode_latents(latents[:, j:k, :])
             z_p.append(z_p_i)
-            codes.append(codes_i)
 
             z_q_i = self.quantizers[i].out_proj(z_p_i)
             z_q = z_q + z_q_i
 
-        return z_q, torch.cat(z_p, dim=1), torch.stack(codes, dim=1)
+        return z_q, torch.cat(z_p, dim=1)
 
 
 if __name__ == "__main__":

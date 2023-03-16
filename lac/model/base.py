@@ -10,7 +10,7 @@ class CodecMixin:
     EXT = ".lac"
     
     @torch.no_grad()
-    def encode(
+    def reconstruct(
         self,
         audio_path_or_signal,
         overlap_win_duration: float = 5.0,
