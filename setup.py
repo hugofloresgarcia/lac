@@ -27,7 +27,7 @@ setup(
     packages=find_packages(),
     keywords=["audio", "compression", "machine learning"],
     install_requires=[
-        "audiotools @ git+https://github.com/descriptinc/lyrebird-audiotools.git@0.6.3",
+        "audiotools @ git+https://github.com/hugofloresgarcia/audiotools",
         "einops",
     ],
     extras_require={
