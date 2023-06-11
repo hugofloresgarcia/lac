@@ -2,15 +2,18 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
 from torch.nn.utils import weight_norm
+
+import cached_conv as cc
 
 
 def WNConv1d(*args, **kwargs):
-    return weight_norm(nn.Conv1d(*args, **kwargs))
+    return weight_norm(
+        cc.Conv1d(*args, **kwargs)
+    )
 
 def WNConvTranspose1d(*args, **kwargs):
-    return weight_norm(nn.ConvTranspose1d(*args, **kwargs))
+    return weight_norm(cc.ConvTranspose1d(*args, **kwargs))
 
 
 # Scripting this brings model speed up 1.4x

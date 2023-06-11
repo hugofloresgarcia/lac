@@ -167,3 +167,6 @@ ckpt/
 .syncthing*
 tests/assets/
 archived/
+
+
+scratch/

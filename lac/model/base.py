@@ -5,7 +5,6 @@ import torch
 import tqdm
 from audiotools import AudioSignal
 
-
 class CodecMixin:
     EXT = ".lac"
     

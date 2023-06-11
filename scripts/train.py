@@ -125,10 +125,15 @@ def load(
             "map_location": "cpu",
             "package": not load_weights,
         }
-        if (Path(kwargs["folder"]) / "generator").exists():
+
+        if (Path(kwargs["folder"]) / "lac").exists():
             generator, g_extra = LAC.load_from_folder(**kwargs)
+        else:
+            raise ValueError(f"could not find generator ckpt in {kwargs['folder']}")
         if (Path(kwargs["folder"]) / "discriminator").exists():
             discriminator, d_extra = Discriminator.load_from_folder(**kwargs)
+        else:
+            raise ValueError(f"could not find discriminator ckpt in {kwargs['folder']}")
 
     generator = LAC() if generator is None else generator
     discriminator = Discriminator() if discriminator is None else discriminator
@@ -166,6 +171,21 @@ def load(
         "scheduler_d": scheduler_d,
         "trainer_state": trainer_state,
     }
+
+
+def num_params_hook(o, p):
+    return o + f" {p/1e6:<.3f}M params."
+
+
+def add_num_params_repr_hook(model):
+    import numpy as np
+    from functools import partial
+
+    for n, m in model.named_modules():
+        o = m.extra_repr()
+        p = sum([np.prod(p.size()) for p in m.parameters()])
+
+        setattr(m, "extra_repr", partial(num_params_hook, o=o, p=p))
 
 
 @argbind.bind(without_prefix=True)
@@ -208,6 +228,15 @@ def train(
     optimizer_d = loaded["optimizer_d"]
     scheduler_d = loaded["scheduler_d"]
     trainer_state = loaded["trainer_state"]
+
+    # log a model summary w/ num params
+    if accel.local_rank == 0:
+        add_num_params_repr_hook(accel.unwrap(generator))
+        add_num_params_repr_hook(accel.unwrap(discriminator))
+        with open(f"{save_path}/generator.txt", "w") as f:
+            f.write(repr(accel.unwrap(generator)))
+        with open(f"{save_path}/discriminator.txt", "w") as f:
+            f.write(repr(accel.unwrap(discriminator)))
 
     sample_rate = accel.unwrap(generator).sample_rate
 
@@ -285,7 +314,7 @@ def train(
             output["stft/nz"] = stft_loss(noisy, clean)
             output["stft/imp"] = output["stft/nz"] - output["stft/loss"]
             output["other/learning_rate"] = optimizer_g.param_groups[0]["lr"]
-            output["other/batch_size"] = noisy.batch_size * accel.world_size
+            output["other/batch_size"] = torch.tensor(noisy.batch_size * accel.world_size)
 
             return {k: v for k, v in sorted(output.items())}
 

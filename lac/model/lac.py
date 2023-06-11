@@ -1,6 +1,6 @@
 import math
 from typing import List
-from typing import Union
+from typing import Union, Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -42,7 +42,7 @@ class EncoderBlock(nn.Module):
         super().__init__()
         self.block = nn.Sequential(
             EncoderLayer(dim // 2, dilation=1),
-            EncoderLayer(dim // 2, dilation=3),
+            # EncoderLayer(dim // 2, dilation=3),
             EncoderLayer(dim // 2, dilation=9),
             Snake1d(dim // 2),
             WNConv1d(
@@ -81,7 +81,7 @@ class Encoder(nn.Module):
 
         # Wrap black into nn.Sequential
         self.block = nn.Sequential(*self.block)
-        self.enc_dim = d_model
+        self.register_buffer("enc_dim", torch.tensor(d_model))
 
     def forward(self, x):
         return self.block(x)
@@ -181,17 +181,29 @@ class Decoder(nn.Module):
         channels,
         rates,
         d_out: int = 1,
+        tiny: bool = True,
     ):
         super().__init__()
 
         # Add first conv layer
         layers = [WNConv1d(input_channel, channels, kernel_size=7, padding=3)]
 
+        if tiny:
+            resblock_kernel_sizes = [3, 7]
+            resblock_dilation_sizes = [[1, 3, 5], [1, 3, 5]]
+        else:
+            resblock_kernel_sizes = [3, 7, 11]
+            resblock_dilation_sizes = [[1, 3, 5], [1, 3, 5], [1, 3, 5]]
+
+
         # Add upsampling + MRF blocks
         for i, stride in enumerate(rates):
             input_dim = channels // 2**i
             output_dim = channels // 2 ** (i + 1)
-            layers += [Block(input_dim, output_dim, stride)]
+            layers += [Block(
+                input_dim, output_dim, stride, 
+                resblock_kernel_sizes, resblock_dilation_sizes
+            )]
 
         # Add final conv layer
         layers += [
@@ -227,7 +239,9 @@ class LAC(BaseModel, CodecMixin):
         self.decoder_rates = decoder_rates
         self.sample_rate = sample_rate
 
-        self.hop_length = np.prod(decoder_rates)
+        self.register_buffer(
+            "hop_length", torch.tensor(np.prod(encoder_rates))
+        )
         self.encoder = Encoder(encoder_dim, encoder_rates)
 
         self.n_codebooks = n_codebooks
@@ -235,7 +249,7 @@ class LAC(BaseModel, CodecMixin):
         self.codebook_dim = codebook_dim
 
         self.quantizer = ResidualVectorQuantize(
-            self.encoder.enc_dim, 
+            self.encoder.enc_dim.item(), 
             n_codebooks=n_codebooks,
             codebook_size=codebook_size,
             codebook_dim=codebook_dim,
@@ -243,32 +257,37 @@ class LAC(BaseModel, CodecMixin):
         )
 
         self.decoder = Decoder(
-            self.encoder.enc_dim,
+            self.encoder.enc_dim.item(),
             decoder_dim,
             decoder_rates,
         )
         self.sample_rate = sample_rate
         self.apply(init_weights)
 
-    def preprocess(self, audio_data, sample_rate):
+    def preprocess(self, audio_data: torch.Tensor, sample_rate: Optional[int]) -> Tuple[torch.Tensor, int]:
         if sample_rate is None:
             sample_rate = self.sample_rate
         assert sample_rate == self.sample_rate
 
         length = audio_data.shape[-1]
-        right_pad = math.ceil(length / self.hop_length) * self.hop_length - length
-        audio_data = nn.functional.pad(audio_data, (0, right_pad))
+        right_pad = int(math.ceil(length / self.hop_length.item()) * self.hop_length.item() - length)
+        audio_data = nn.functional.pad(audio_data, [0, right_pad])
+        
+        # trim to multiple of hop_length
+        # start_point = int(length -math.floor(length / self.hop_length.item()) * self.hop_length.item())
+        # print(f"start_point: {start_point}")
+        # audio_data = audio_data[..., start_point:]
         return audio_data, length
 
     def encode(
         self, 
         audio_data: torch.Tensor, 
-        sample_rate: int = None,
-        n_quantizers: int = None,
+        sample_rate: Optional[int] = None,
+        n_quantizers: Optional[int] = None,
     ):
-        out = {}
+        out: Dict[str, torch.Tensor] = {}
         audio_data, length = self.preprocess(audio_data, sample_rate)
-        out["length"] = length
+        out["length"] = torch.tensor(length)
         
         out["z"] = self.encoder(audio_data)
         out.update(self.quantizer(out["z"], n_quantizers))
@@ -277,22 +296,24 @@ class LAC(BaseModel, CodecMixin):
     def decode(
         self, 
         z: torch.Tensor,
-        length: int = None
+        length: Optional[int] = None
     ):
         out = {}
         x = self.decoder(z)
+        # print(f"trimming from {x.shape[-1]} to {length}")
         out["audio"] = x[..., :length]
         return out
 
     def forward(
         self,
         audio_data: torch.Tensor,
-        sample_rate: int = None,
-        n_quantizers: int = None,
+        sample_rate: Optional[int] = None,
+        n_quantizers: Optional[int] = None,
     ):
-        out = {}
+        out: Dict[str, torch.Tensor] = {}
         out.update(self.encode(audio_data, sample_rate, n_quantizers))
-        out.update(self.decode(out["z"], out["length"]))
+        
+        out.update(self.decode(out["z"], out["length"].item()))
         return out
 
 
@@ -304,17 +325,25 @@ if __name__ == "__main__":
     x = AudioSignal(x, 44100)
 
     print(x)
-    model = LAC().cuda()
+    model = LAC(
+        encoder_dim=48,
+        encoder_rates=[2, 4, 8, 8], 
+        decoder_dim=512,
+        decoder_rates=[4, 4, 4, 2, 2, 2],
+        n_codebooks=7,
+        codebook_size=1024,
+        codebook_dim=8,
+    )
 
-    for n, m in model.named_modules():
-        o = m.extra_repr()
-        p = sum([np.prod(p.size()) for p in m.parameters()])
-        fn = lambda o, p: o + f" {p/1e6:<.3f}M params."
-        setattr(m, "extra_repr", partial(fn, o=o, p=p))
-    print(model)
-    print("Total # of params: ", sum([np.prod(p.size()) for p in model.parameters()]))
+    # for n, m in model.named_modules():
+    #     o = m.extra_repr()
+    #     p = sum([np.prod(p.size()) for p in m.parameters()])
+    #     fn = lambda o, p: o + f" {p/1e6:<.3f}M params."
+    #     setattr(m, "extra_repr", partial(fn, o=o, p=p))
+    # print(model)
+    # print("Total # of params: ", sum([np.prod(p.size()) for p in model.parameters()]))
 
-    output = model.encode(x, verbose=True)
+    # output = model.encode(x.audio_data)
 
     length = 88200 * 2
     x = torch.randn(1, 1, length).to(model.device)

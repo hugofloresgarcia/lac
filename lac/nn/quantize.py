@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional, Dict, Any
 
 import numpy as np
 import torch
@@ -76,7 +76,10 @@ class VectorQuantize(nn.Module):
         return self.embed_code(embed_id).transpose(1, 2)
 
     def decode_latents(self, latents):
-        encodings = rearrange(latents, "b d t -> (b t) d")
+        # encodings = rearrange(latents, "b d t -> (b t) d")
+        encodings = latents.permute(0, 2, 1)
+        encodings = encodings.reshape(-1, encodings.shape[-1])
+
         codebook = self.codebook.weight  # codebook: (N x D)
 
         # L2 normalize encodings and codebook (ViT-VQGAN)
@@ -89,7 +92,9 @@ class VectorQuantize(nn.Module):
             - 2 * encodings @ codebook.t()
             + codebook.pow(2).sum(1, keepdim=True).t()
         )
-        indices = rearrange((-dist).max(1)[1], "(b t) -> b t", b=latents.size(0))
+        # indices = rearrange((-dist).max(1)[1], "(b t) -> b t", b=latents.size(0))
+        indices = (-dist).max(1)[1].view(latents.size(0), -1)
+
         z_q = self.decode_code(indices)
         return z_q, indices
 
@@ -124,7 +129,7 @@ class ResidualVectorQuantize(nn.Module):
         )
         self.quantizer_dropout = quantizer_dropout
 
-    def forward(self, z, n_quantizers: int = None):
+    def forward(self, z: torch.Tensor, n_quantizers: Optional[int] = None) -> Dict[str, torch.Tensor]:
         """Quantized the input tensor using a fixed set of `n` codebooks and returns
         the corresponding codebook vectors
         Parameters
@@ -204,11 +209,12 @@ class ResidualVectorQuantize(nn.Module):
         z_q = 0.0
         z_p = []
         n_codebooks = codes.shape[1]
-        for i in range(n_codebooks):
-            z_p_i = self.quantizers[i].decode_code(codes[:, i, :])
+        assert n_codebooks == len(self.quantizers), "torch.jit.script does not support dynamic ModuleList indexing"
+        for i, quantizer in enumerate(self.quantizers):
+            z_p_i = quantizer.decode_code(codes[:, i, :])
             z_p.append(z_p_i)
 
-            z_q_i = self.quantizers[i].out_proj(z_p_i)
+            z_q_i = quantizer.out_proj(z_p_i)
             z_q = z_q + z_q_i
         return z_q, torch.cat(z_p, dim=1), codes
 

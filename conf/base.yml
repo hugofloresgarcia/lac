@@ -1,20 +1,20 @@
 # Model setup
-LAC.sample_rate: 44100
-LAC.encoder_dim: 64
-LAC.encoder_rates: [2, 4, 8, 8]
-LAC.decoder_dim: 1536
-LAC.decoder_rates: [4, 4, 4, 2, 2, 2]
+LAC.sample_rate: 40000
+LAC.encoder_dim: 32
+LAC.encoder_rates: [2, 4, 8, 8,]
+LAC.decoder_dim: 512
+LAC.decoder_rates: [8, 8, 4, 2]
 
 # Quantization
-LAC.n_codebooks: 9
+LAC.n_codebooks: 4
 LAC.codebook_size: 1024
-LAC.codebook_dim: 8
-LAC.quantizer_dropout: true
+LAC.codebook_dim: 12
+LAC.quantizer_dropout: false
 
 # Discriminator
-Discriminator.sample_rate: 44100
+Discriminator.sample_rate: 40000
 Discriminator.rates: []
-Discriminator.periods: [2, 3, 5, 7, 11]
+Discriminator.periods: [ 3, 5, 7]
 Discriminator.fft_sizes: [2048, 1024, 512]
 Discriminator.bands:
   - [0.0, 0.1]
@@ -34,7 +34,7 @@ generator/AdamW.lr: 0.0001
 generator/ExponentialLR.gamma: 0.999996
 
 amp: false
-val_batch_size: 100
+val_batch_size: 7
 device: cuda
 epoch_length: 1000
 num_epochs: 3000
@@ -55,13 +55,50 @@ VolumeNorm.db: [const, -16]
 # Transforms
 build_transform.preprocess:
   - Identity
-build_transform.augment_prob: 0.0
+build_transform.augment_prob: 0.95
 build_transform.augment:
-  - Identity
+  - LowPass
+  - HighPass
+  - Equalizer
+  - FrequencyMask
+  # - CorruptPhase
+  - BackgroundNoise
+  # - FrequencyNoise
+  - ClippingDistortion
+  - RoomImpulseResponse
 build_transform.postprocess:
   - VolumeNorm
   - RescaleAudio
   - ShiftPhase
+
+RoomImpulseResponse.prob: 0.9
+
+BackgroundNoise.prob: 0.8
+BackgroundNoise.snr: ["uniform", 10, 30]
+BackgroundNoise.sources: 
+- /media/CHONK/patrick/data/noise-database
+
+
+HighPass.prob: 0.3
+HighPass.cutoff: ["choice", [100, 200, 400, 800]]
+
+LowPass.prob: 0.4
+LowPass.cutoff: ["choice", [8000, 1200, 2400, 4800, 9600, 16000]]
+
+ClippingDistortion.prob: 0.3
+
+Equalizer.prob: 0.7
+Equalizer.eq_amt: ["uniform", -3, 3]
+
+FrequencyMask.prob: 0.5
+# FrequencyNoise.prob: 0.5
+
+CorruptPhase.prob: 0.3
+
+RoomImpulseResponse.sources: 
+- /media/CHONK/patrick/data/MIT-IR
+- /media/CHONK/patrick/data/rir-database
+
 
 # Loss setup
 MultiScaleSTFTLoss.window_lengths: [2048, 512]
@@ -74,8 +111,8 @@ MelSpectrogramLoss.clamp_eps: 1.0e-5
 MelSpectrogramLoss.mag_weight: 0.0
 
 # Data
-batch_size: 96
-train/AudioDataset.duration: 0.38
+batch_size: 7
+train/AudioDataset.duration: 0.75
 train/AudioDataset.n_examples: 10000000
 
 val/AudioDataset.duration: 5.0
@@ -86,31 +123,9 @@ AudioLoader.shuffle: true
 AudioDataset.without_replacement: true
 
 train/build_dataset.folders:
-  speech_fb:
-    - /data/daps/train
-  speech_hq:
-    - /data/vctk
-    - /data/vocalset
-    - /data/read_speech
-    - /data/french_speech
-  speech_uq:
-    - /data/emotional_speech/
-    - /data/common_voice/
-    - /data/german_speech/
-    - /data/russian_speech/
-    - /data/spanish_speech/
-  music_hq:
-    - /data/musdb/train
-  music_uq:
-    - /data/jamendo
-  general: 
-    - /data/audioset/data/unbalanced_train_segments/
-    - /data/audioset/data/balanced_train_segments/
+  music:
+    - /media/CHONK/data/nsynth/nsynth-train/audio
 
 val/build_dataset.folders:
-  speech_hq:
-    - /data/daps/val
-  music_hq:
-    - /data/musdb/test
-  general: 
-    - /data/audioset/data/eval_segments/
+  music:
+    - /media/CHONK/data/nsynth/nsynth-valid/audio
