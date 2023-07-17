@@ -1,5 +1,5 @@
 argbind>=0.3.1
-audiotools @ git+https://github.com/descriptinc/lyrebird-audiotools.git@0.7.2
+descript-audiotools @ git+https://github.com/descriptinc/lyrebird-audiotools.git@0.7.2
 tensorboard
 pytest
 pytest-cov
