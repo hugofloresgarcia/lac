@@ -27,7 +27,7 @@ setup(
     packages=find_packages(),
     keywords=["audio", "compression", "machine learning"],
     install_requires=[
-        "audiotools @ git+https://github.com/hugofloresgarcia/audiotools.git",
+        "descript-audiotools @ git+https://github.com/descriptinc/audiotools.git@0.7.2",
         "einops",
     ],
     extras_require={
